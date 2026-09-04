@@ -1,6 +1,5 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Subscription } from 'rxjs';
 import { PizzeriaService } from './services/pizzeria.service';
 import { OrdersComponent } from './components/orders/orders.component';
 import { PaymentsComponent } from './components/payments/payments.component';
@@ -15,12 +14,12 @@ import {
  * App (Root Component)
  * 
  * Clean Code & Arquitectura:
- * - Toda la lógica y nombres de propiedades/métodos están en inglés.
+ * - Toda la lógica y nombres en inglés.
  * - Comentarios explicativos en español para docencia.
  * - Archivos separados: app.ts (lógica), app.html (template) y app.css (estilos).
  * - Delega la comunicación HTTP al servicio inyectado (PizzeriaService).
- * - NO usa Signals: maneja estado mediante propiedades estándar y RxJS subscriptions.
- * - Implementa OnDestroy para desuscribirse y evitar fugas de memoria.
+ * - NO usa Signals, NO usa BehaviorSubject, NO usa Subject.
+ * - Maneja el estado local directamente en propiedades estándar de TypeScript.
  * - Descompone la interfaz en subcomponentes modulares (OrdersComponent, PaymentsComponent).
  */
 @Component({
@@ -30,11 +29,11 @@ import {
   templateUrl: './app.html',
   styleUrls: ['./app.css']
 })
-export class App implements OnInit, OnDestroy {
+export class App implements OnInit {
   // Inyección de dependencias moderna mediante inject()
   private readonly pizzeriaService = inject(PizzeriaService);
 
-  // Estado de la interfaz (sin signals)
+  // Estado de la interfaz mediante propiedades estándar de TypeScript
   activeTab: 'dashboard' | 'orders' | 'payments' = 'dashboard';
   isLoading: boolean = false;
 
@@ -43,23 +42,9 @@ export class App implements OnInit, OnDestroy {
   paymentsList: Payment[] = [];
   logs: NetworkLogEntry[] = [];
 
-  private logsSubscription?: Subscription;
-
   ngOnInit(): void {
-    // Suscripción al stream reactivo de trazas de red
-    this.logsSubscription = this.pizzeriaService.logs$.subscribe({
-      next: (updatedLogs) => {
-        this.logs = updatedLogs;
-      }
-    });
-
-    // Carga la pestaña inicial
+    // Carga de la pestaña inicial
     this.loadDashboard();
-  }
-
-  ngOnDestroy(): void {
-    // Limpieza de suscripciones para evitar memory leaks
-    this.logsSubscription?.unsubscribe();
   }
 
   switchTab(tab: 'dashboard' | 'orders' | 'payments'): void {
@@ -75,47 +60,74 @@ export class App implements OnInit, OnDestroy {
 
   loadDashboard(): void {
     this.isLoading = true;
+    const startTime = performance.now();
+    const endpoint = '/api/inicio';
+
     this.pizzeriaService.getDashboard().subscribe({
       next: (response) => {
+        const durationMs = Math.round(performance.now() - startTime);
         this.dashboardData = response.body;
         this.isLoading = false;
+        this.addLog('GET', endpoint, response.status, durationMs, `BFF Fan-Out consolidado (${durationMs}ms)`);
       },
-      error: (err) => {
-        console.error('Error al obtener datos del dashboard:', err);
+      error: (error) => {
+        const durationMs = Math.round(performance.now() - startTime);
         this.isLoading = false;
+        this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
+        console.error('Error loading dashboard:', error);
       }
     });
   }
 
   loadOrders(): void {
     this.isLoading = true;
+    const startTime = performance.now();
+    const endpoint = '/api/pedidos';
+
     this.pizzeriaService.getOrders().subscribe({
       next: (response) => {
+        const durationMs = Math.round(performance.now() - startTime);
         this.ordersList = response.body?.items || [];
         this.isLoading = false;
+        this.addLog('GET', endpoint, response.status, durationMs, `Microservicio pedidos-service :8081 (${durationMs}ms)`);
       },
-      error: (err) => {
-        console.error('Error al obtener pedidos:', err);
+      error: (error) => {
+        const durationMs = Math.round(performance.now() - startTime);
         this.isLoading = false;
+        this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
+        console.error('Error loading orders:', error);
       }
     });
   }
 
   loadPayments(): void {
     this.isLoading = true;
+    const startTime = performance.now();
+    const endpoint = '/api/pagos';
+
     this.pizzeriaService.getPayments().subscribe({
       next: (response) => {
+        const durationMs = Math.round(performance.now() - startTime);
         this.paymentsList = response.body?.items || [];
         this.isLoading = false;
+        this.addLog('GET', endpoint, response.status, durationMs, `Microservicio pagos-service :8082 (${durationMs}ms)`);
       },
-      error: (err) => {
-        console.error('Error al obtener pagos:', err);
+      error: (error) => {
+        const durationMs = Math.round(performance.now() - startTime);
         this.isLoading = false;
+        this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
+        console.error('Error loading payments:', error);
       }
     });
   }
 
   clearLogs(): void {
-    this.pizzeriaService.clearLogs();
+    this.logs = [];
+  }
+
+  private addLog(method: string, url: string, status: number, durationMs: number, detail: string): void {
+    const time = new Date().toLocaleTimeString('es-AR', { hour12: false });
+    const newEntry: NetworkLogEntry = { time, method, url, status, durationMs, detail };
+    this.logs = [newEntry, ...this.logs].slice(0, 25);
   }
 }
