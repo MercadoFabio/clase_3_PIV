@@ -1,0 +1,33 @@
+<section class="section-card">
+  <div class="view-header">
+    <div>
+      <div class="service-tag">MICROSERVICIO INDEPENDIENTE</div>
+      <h2>Microservicio de Pagos</h2>
+      <p class="view-subtitle">
+        Datos provistos por <code>pagos-service:8082</code> consumidos vía BFF (<code>/api/pagos</code>).
+      </p>
+    </div>
+    <button class="btn-refresh" (click)="onRefresh()">🔄 Refrescar</button>
+  </div>
+
+  <div class="cards-grid">
+    @for (item of items; track item.id) {
+      <div class="item-card">
+        <div class="item-header">
+          <span class="item-id">Pago #{{ item.id }}</span>
+          <span class="badge" 
+            [class.badge-green]="item.estado === 'PAGADO'" 
+            [class.badge-amber]="item.estado === 'PENDIENTE'">
+            {{ item.estado }}
+          </span>
+        </div>
+        <div class="item-body">
+          <p class="order-ref">Asociado a: <strong>Pedido #{{ item.pedidoId }}</strong></p>
+          <h4 class="amount">${{ item.monto.toLocaleString('es-AR') }}</h4>
+        </div>
+      </div>
+    } @empty {
+      <p class="empty-state">No hay pagos registrados en este momento.</p>
+    }
+  </div>
+</section>

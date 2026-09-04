@@ -1,0 +1,177 @@
+<!-- ============================================================
+     app.html — Template del componente raíz
+     Pizzería Don Nginx · Clean Code & Arquitectura Modular
+     - Template enlazado a propiedades TypeScript en inglés.
+     - Comentarios en español para facilitar la comprensión en clase.
+     ============================================================ -->
+
+<div class="app-container">
+
+  <!-- ── HEADER ──────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="brand">
+      <span class="logo">🍕</span>
+      <div>
+        <h1>Pizzería Don Nginx</h1>
+        <p class="subtitle">
+          Arquitectura de Microservicios con <strong>BFF (Backend for Frontend)</strong>
+        </p>
+      </div>
+    </div>
+    <div class="infra-badge">
+      <span class="dot"></span>
+      Nginx :4200 &rarr; BFF :3000 &rarr; pedidos-service :8081 / pagos-service :8082
+    </div>
+  </header>
+
+  <!-- ── NAVBAR ────────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <button
+      class="nav-btn"
+      [class.active]="activeTab === 'dashboard'"
+      (click)="switchTab('dashboard')">
+      🏠 Panel Consolidado (BFF /api/inicio)
+    </button>
+    <button
+      class="nav-btn"
+      [class.active]="activeTab === 'orders'"
+      (click)="switchTab('orders')">
+      📋 Microservicio Pedidos (/api/pedidos)
+    </button>
+    <button
+      class="nav-btn"
+      [class.active]="activeTab === 'payments'"
+      (click)="switchTab('payments')">
+      💳 Microservicio Pagos (/api/pagos)
+    </button>
+  </nav>
+
+  <!-- ── ÁREA PRINCIPAL ──────────────────────────────────────── -->
+  <main class="content-area">
+
+    @if (isLoading) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Consultando a la arquitectura de microservicios...</p>
+      </div>
+    } @else {
+
+      <!-- ── TAB 1: DASHBOARD (BFF FAN-OUT) ─────────────────────── -->
+      @if (activeTab === 'dashboard' && dashboardData; as data) {
+        <section class="section-card">
+
+          <!-- Banner explicativo del patrón BFF -->
+          <div class="bff-banner">
+            <span class="bff-icon">⚡</span>
+            <div>
+              <strong>Patrón BFF en acción:</strong> El navegador hizo
+              <em>una sola llamada</em> a <code>/api/inicio</code>.
+              El BFF ejecutó un <strong>Fan-Out en paralelo</strong> hacia
+              <code>pedidos-service:8081</code> y <code>pagos-service:8082</code>,
+              combinó los datos en <strong>{{ data.meta?.tiempoFanOutMs }}ms</strong>
+              y entregó esta vista lista para renderizar.
+            </div>
+          </div>
+
+          <!-- Métricas del Resumen -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <span class="kpi-label">Total Pedidos</span>
+              <span class="kpi-value">{{ data.resumen.totalPedidos }}</span>
+            </div>
+            <div class="kpi-card green">
+              <span class="kpi-label">Pagados</span>
+              <span class="kpi-value">{{ data.resumen.totalPagados }}</span>
+            </div>
+            <div class="kpi-card amber">
+              <span class="kpi-label">Pendientes</span>
+              <span class="kpi-value">{{ data.resumen.totalPendientes }}</span>
+            </div>
+            <div class="kpi-card purple">
+              <span class="kpi-label">Recaudación Confirmada</span>
+              <span class="kpi-value">
+                ${{ data.resumen.recaudacionConfirmada.toLocaleString('es-AR') }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Grilla de pedidos consolidados con pagos -->
+          <h3>Pedidos y Estado de Pago Consolidado</h3>
+          <div class="cards-grid">
+            @for (order of data.pedidos; track order.id) {
+              <div class="item-card">
+                <div class="item-header">
+                  <span class="item-id">Pedido #{{ order.id }}</span>
+                  <span class="badge"
+                    [class.badge-green]="order.pago?.estado === 'PAGADO'"
+                    [class.badge-amber]="order.pago?.estado === 'PENDIENTE'">
+                    {{ order.pago?.estado }}
+                  </span>
+                </div>
+                <div class="item-body">
+                  <h4>{{ order.pizza }}</h4>
+                  <p class="item-quantity">Cantidad: <strong>x{{ order.cantidad }}</strong></p>
+                  <p class="item-price">
+                    Monto: <strong>${{ order.pago?.monto?.toLocaleString('es-AR') }}</strong>
+                  </p>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- ── TAB 2: PEDIDOS (COMPONENTE MODULAR) ─────────────────── -->
+      @if (activeTab === 'orders') {
+        <app-orders 
+          [items]="ordersList" 
+          (refresh)="loadOrders()">
+        </app-orders>
+      }
+
+      <!-- ── TAB 3: PAGOS (COMPONENTE MODULAR) ───────────────────── -->
+      @if (activeTab === 'payments') {
+        <app-payments 
+          [items]="paymentsList" 
+          (refresh)="loadPayments()">
+        </app-payments>
+      }
+
+    }
+  </main>
+
+  <!-- ── CONSOLA DE TRAZAS EN VIVO ─────────────────────────── -->
+  <aside class="live-console">
+    <div class="console-header">
+      <div class="console-title">
+        <span class="rec-dot"></span>
+        <strong>Trazas de Red en Vivo (Frontend &rarr; Nginx &rarr; BFF &rarr; Microservicios)</strong>
+      </div>
+      <div class="console-actions">
+        <span class="log-count">{{ logs.length }} eventos</span>
+        <button class="btn-clear" (click)="clearLogs()">Limpiar</button>
+      </div>
+    </div>
+
+    <div class="console-body">
+      @for (log of logs; track log.time) {
+        <div class="log-row">
+          <span class="log-time">{{ log.time }}</span>
+          <span class="log-method">{{ log.method }}</span>
+          <span class="log-url">{{ log.url }}</span>
+          <span class="log-status" [class.status-200]="log.status === 200">
+            {{ log.status }} OK
+          </span>
+          <span class="log-duration">{{ log.durationMs }}ms</span>
+          <span class="log-detail">{{ log.detail }}</span>
+        </div>
+      } @empty {
+        <div class="log-empty">
+          Hacé clic en las pestañas del navbar para ver las peticiones
+          pasar por el BFF y los microservicios en tiempo real...
+        </div>
+      }
+    </div>
+  </aside>
+
+</div>
