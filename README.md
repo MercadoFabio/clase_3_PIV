@@ -53,19 +53,31 @@ El proyecto implementa la arquitectura de microservicios explicada en la clase (
 
 ---
 
-## 🚀 Cómo Levantarlo
+## 🚀 Cómo Levantarlo (En tu PC o en otra nueva)
 
 ### Requisitos
-* Docker y Docker Compose instalados.
+* Tener **Docker Desktop** abierto y funcionando.
 
-### Ejecución
+---
+
+### Opción Rápida con 1 Clic (Windows)
+
+El repositorio incluye dos scripts listos para usar sin tener que escribir comandos:
+
+1. **`iniciar-proyecto.bat`**: Doble clic y levanta automáticamente los 3 contenedores con Docker Compose.
+   * La app queda lista en: **<http://localhost:4200>**.
+2. **`compartir-en-vivo.bat`**: Doble clic y genera una **URL pública con HTTPS al instante**.
+   * Si estás en una PC nueva y no tenés `cloudflared.exe`, el script **lo descarga solo en 5 segundos** y abre el túnel.
+   * Te muestra en pantalla el link público para compartir con tus alumnos.
+
+---
+
+### Opción Manual por Consola
 ```bash
 cd example
-docker compose up --build
+docker compose up --build -d
 ```
-
-Luego abrir en el navegador:
-👉 **<http://localhost:4200>**
+Abrir en el navegador: 👉 **<http://localhost:4200>**
 
 Para detener los contenedores:
 ```bash

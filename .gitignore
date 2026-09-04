@@ -13,3 +13,7 @@ Thumbs.db
 **/target/
 **/.angular/
 **/dist/
+
+cloudflared.exe
+
+ngrok.exe
