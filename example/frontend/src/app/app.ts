@@ -19,7 +19,8 @@ import {
  * - Archivos separados: app.ts (lógica), app.html (template) y app.css (estilos).
  * - Delega la comunicación HTTP al servicio inyectado (PizzeriaService).
  * - NO usa Signals, NO usa BehaviorSubject, NO usa Subject.
- * - Manejo suave de carga con spinners y banderas independientes para evitar parpadeos bruscos.
+ * - Carga los datos siempre al cambiar de tab para que el spinner y la traza
+ *   se puedan apreciar en vivo en cada clic.
  */
 @Component({
   selector: 'app-root',
@@ -34,7 +35,7 @@ export class App implements OnInit {
   // Estado activo de la interfaz
   activeTab: 'dashboard' | 'orders' | 'payments' = 'dashboard';
 
-  // Banderas de carga independientes para transiciones suaves
+  // Banderas de carga independientes
   isDashboardLoading: boolean = false;
   isOrdersLoading: boolean = false;
   isPaymentsLoading: boolean = false;
@@ -50,11 +51,12 @@ export class App implements OnInit {
 
   switchTab(tab: 'dashboard' | 'orders' | 'payments'): void {
     this.activeTab = tab;
-    if (tab === 'dashboard' && !this.dashboardData) {
+    // Siempre recargamos al cambiar de pestaña para mostrar la interacción en vivo
+    if (tab === 'dashboard') {
       this.loadDashboard();
-    } else if (tab === 'orders' && this.ordersList.length === 0) {
+    } else if (tab === 'orders') {
       this.loadOrders();
-    } else if (tab === 'payments' && this.paymentsList.length === 0) {
+    } else if (tab === 'payments') {
       this.loadPayments();
     }
   }
