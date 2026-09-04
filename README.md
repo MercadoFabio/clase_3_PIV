@@ -11,6 +11,13 @@ Material de clase y proyecto práctico interactivo para la cátedra de **Program
 | **[`01-nginx-arquitectura-portable.html`](./01-nginx-arquitectura-portable.html)** | Presentación interactiva Reveal.js portable (69 filminas auto-contenidas, sin dependencias externas). Cubre Cliente-Servidor, roles de Nginx, Gateway, Docker (VM vs Contenedor) y el patrón BFF. |
 | **[`example/`](./example/)** | Proyecto práctico multi-contenedor listo para producción/clase con **Angular**, **Nginx**, **Node.js (BFF)** y **Spring Boot**. |
 
+### 📽️ Presentación de la clase
+
+La presentación de esta clase también está disponible online en:
+
+- **Link público:** <https://nginx-arquitectura-tup.netlify.app/>
+- **Carga del HTML local:** [01-nginx-arquitectura-portable.html](./01-nginx-arquitectura-portable.html)
+
 ---
 
 ## 🏗️ Arquitectura del Ejemplo Práctico (`example/`)
