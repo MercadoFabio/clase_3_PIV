@@ -1,0 +1,5 @@
+# Lo que no tiene sentido mandarle al build: se instala o se genera adentro.
+node_modules
+dist
+.angular
+.vscode

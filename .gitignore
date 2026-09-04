@@ -1,0 +1,15 @@
+# Documentacion privada de catedra (no subir)
+TUP_*.md
+
+# Archivos de respaldo y temporales
+*.bak
+example.zip
+output/
+.DS_Store
+Thumbs.db
+
+# Dependencias y compilados (en caso de correr en local sin Docker)
+**/node_modules/
+**/target/
+**/.angular/
+**/dist/

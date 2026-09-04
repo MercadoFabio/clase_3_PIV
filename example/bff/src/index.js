@@ -1,0 +1,138 @@
+import express from 'express';
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// URL del backend / microservicios dentro de la red interna de Docker.
+const BACKEND_URL = process.env.BACKEND_URL || 'http://backend:8080';
+
+// ---------------------------------------------------------------------------
+// Middleware de Logging en Vivo
+// ---------------------------------------------------------------------------
+app.use((req, res, next) => {
+  const start = Date.now();
+  const timeStr = new Date().toLocaleTimeString('es-AR', { hour12: false });
+  console.log(`[${timeStr}] [BFF :3000] 📥 Peticion entrante: ${req.method} ${req.originalUrl}`);
+
+  res.on('finish', () => {
+    const elapsed = Date.now() - start;
+    console.log(`[${timeStr}] [BFF :3000] 📤 Respuesta enviada: ${req.method} ${req.originalUrl} -> Status ${res.statusCode} (${elapsed}ms)`);
+  });
+
+  // Cabecera informativa para que el frontend y los alumnos identifiquen al BFF
+  res.setHeader('X-Handled-By', 'BFF-NodeJS-Express');
+  next();
+});
+
+// ---------------------------------------------------------------------------
+// 1. Endpoint Consolidado: GET /api/inicio
+// ---------------------------------------------------------------------------
+// Filminas 27-C, 35 y 36: Resuelve la pantalla combinada ejecutando un Fan-Out
+// en paralelo hacia los microservicios de dominio (pedidos y pagos).
+app.get('/api/inicio', async (req, res) => {
+  const t0 = performance.now();
+  console.log(`[BFF :3000] 🚀 [Fan-Out Paralelo] Consultando ${BACKEND_URL}/pedidos y ${BACKEND_URL}/pagos al mismo tiempo...`);
+
+  try {
+    const [pedidosRes, pagosRes] = await Promise.all([
+      fetch(`${BACKEND_URL}/pedidos`),
+      fetch(`${BACKEND_URL}/pagos`),
+    ]);
+
+    if (!pedidosRes.ok || !pagosRes.ok) {
+      throw new Error(`Upstream error: pedidos=${pedidosRes.status}, pagos=${pagosRes.status}`);
+    }
+
+    const pedidos = await pedidosRes.json();
+    const pagos = await pagosRes.json();
+    const elapsed = Math.round(performance.now() - t0);
+
+    console.log(`[BFF :3000] 📦 [Fan-Out Exitoso] ${pedidos.length} pedidos y ${pagos.length} pagos recibidos en ${elapsed}ms. Cruzando datos para la UI...`);
+
+    // Cruzar cada pedido con su estado de pago
+    const pedidosConPago = pedidos.map((pedido) => {
+      const pago = pagos.find((p) => p.pedidoId === pedido.id);
+      return {
+        ...pedido,
+        pago: pago ? { estado: pago.estado, monto: pago.monto } : { estado: 'DESCONOCIDO', monto: 0 },
+      };
+    });
+
+    const totalRecaudado = pagos
+      .filter((p) => p.estado === 'PAGADO')
+      .reduce((acc, p) => acc + p.monto, 0);
+
+    res.json({
+      titulo: 'Pizzeria Don Nginx - Panel de Control',
+      resumen: {
+        totalPedidos: pedidos.length,
+        totalPagados: pagos.filter((p) => p.estado === 'PAGADO').length,
+        totalPendientes: pagos.filter((p) => p.estado === 'PENDIENTE').length,
+        recaudacionConfirmada: totalRecaudado,
+      },
+      pedidos: pedidosConPago,
+      pagosPendientes: pagos.filter((p) => p.estado === 'PENDIENTE'),
+      meta: {
+        origen: 'BFF (Node.js/Express en puerto 3000)',
+        consultasRealizadasEnParalelo: ['GET http://backend:8080/pedidos', 'GET http://backend:8080/pagos'],
+        tiempoFanOutMs: elapsed,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error(`[BFF :3000] ❌ Error en Fan-Out:`, error.message);
+    res.status(502).json({
+      error: 'Error de comunicacion con los servicios backend',
+      detalle: error.message,
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 2. Endpoint Específico: GET /api/pedidos
+// ---------------------------------------------------------------------------
+// Permite que la pantalla de Pedidos consulte directamente a traves del BFF.
+app.get('/api/pedidos', async (req, res) => {
+  console.log(`[BFF :3000] 🍕 Consultando backend:8080/pedidos...`);
+  try {
+    const upstreamRes = await fetch(`${BACKEND_URL}/pedidos`);
+    const data = await upstreamRes.json();
+    res.json({
+      seccion: 'Listado de Pedidos',
+      items: data,
+      meta: { origen: 'BFF -> Backend /pedidos', timestamp: new Date().toISOString() },
+    });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 3. Endpoint Específico: GET /api/pagos
+// ---------------------------------------------------------------------------
+// Permite que la pantalla de Pagos consulte directamente a traves del BFF.
+app.get('/api/pagos', async (req, res) => {
+  console.log(`[BFF :3000] 💳 Consultando backend:8080/pagos...`);
+  try {
+    const upstreamRes = await fetch(`${BACKEND_URL}/pagos`);
+    const data = await upstreamRes.json();
+    res.json({
+      seccion: 'Listado de Pagos',
+      items: data,
+      meta: { origen: 'BFF -> Backend /pagos', timestamp: new Date().toISOString() },
+    });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'UP', service: 'bff' });
+});
+
+app.listen(PORT, () => {
+  console.log(`=======================================================`);
+  console.log(`⚡ [BFF] Node.js/Express iniciado en puerto ${PORT}`);
+  console.log(`🔗 [BFF] Conectado a microservicios en ${BACKEND_URL}`);
+  console.log(`=======================================================`);
+});

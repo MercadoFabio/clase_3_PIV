@@ -1,0 +1,7 @@
+/* Cuatro reglas para que se lea bien en el proyector. Nada mas. */
+body {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  margin: 3rem auto;
+  max-width: 40rem;
+}

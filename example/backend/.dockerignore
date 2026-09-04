@@ -1,0 +1,4 @@
+# target/ se genera adentro del contenedor; no hace falta subirlo al build.
+target
+.mvn
+.vscode

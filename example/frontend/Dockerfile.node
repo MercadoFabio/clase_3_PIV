@@ -1,0 +1,57 @@
+# SOLO A MODO DE EJEMPLO — no lo usa el docker-compose.yml.
+#
+# Sirve la misma aplicacion desde Docker pero sin Nginx, para ver que se pierde
+# cuando no hay un servidor web de verdad adelante. La etapa de build es
+# identica a la del Dockerfile principal: lo unico que cambia es quien entrega
+# los archivos ya compilados.
+
+# ---------------------------------------------------------------------------
+# Etapa 1: compilar. Igual que en el Dockerfile principal.
+# ---------------------------------------------------------------------------
+
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# ---------------------------------------------------------------------------
+# Etapa 2: servir con Node en vez de Nginx.
+# ---------------------------------------------------------------------------
+
+# Aca esta la primera diferencia: la imagen final vuelve a ser Node, porque el
+# servidor que vamos a usar corre sobre Node. Con Nginx la imagen final no
+# tenia nada de Node adentro, y pesaba bastante menos.
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Instala "serve", un servidor de archivos estaticos minimo, dentro de la imagen.
+RUN npm install -g serve
+
+# Copia lo compilado desde la etapa "build" hacia ./public (o sea /app/public).
+# Mismo origen que en el Dockerfile principal; solo cambia el destino.
+COPY --from=build /app/dist/frontend/browser ./public
+
+# Arranca el servidor apuntando a la carpeta public, en el puerto 3000.
+# La opcion -s (single): hace que cualquier ruta que no exista como archivo
+# devuelva index.html, para que el router de Angular sobreviva a un F5.
+CMD ["serve", "-s", "public", "-l", "3000"]
+
+# ---------------------------------------------------------------------------
+# Que se pierde respecto del Dockerfile con Nginx
+# ---------------------------------------------------------------------------
+#
+# 1. No hay proxy inverso. Este servidor solo entrega archivos: no sabe
+#    reenviar /api/... a ningun backend. Y como -s manda TODO lo que no existe
+#    a index.html, /api/pedidos no devuelve 404 sino el HTML de la aplicacion.
+#    El frontend recibe "<!doctype html..." donde esperaba JSON y falla al
+#    parsear. Es un error mas dificil de diagnosticar que un 404 limpio.
+#
+# 2. La imagen final pesa 179 MB contra los 53 MB de la que usa Nginx: mas del
+#    triple, por llevar el runtime de Node entero para hacer algo que Nginx
+#    resuelve con una fraccion del tamano. Se compara con "docker images".
+#
+# 3. "serve" es una herramienta de desarrollo. No trae compresion, cache,
+#    limites de conexiones, TLS ni balanceo. Nginx si.

@@ -1,0 +1,48 @@
+# Bloque donde se declara cada contenedor que forma parte de la aplicacion.
+services:
+
+  # Nombre del servicio. Docker lo usa como nombre de host adentro de la red:
+  # otro contenedor puede llegar hasta aca escribiendo http://frontend.
+  frontend:
+    # Construye la imagen con el Dockerfile que esta en la carpeta ./frontend
+    # (en vez de bajar una imagen ya hecha de Docker Hub).
+    build: ./frontend
+
+    # Publica un puerto hacia afuera. Es el unico servicio que lo hace, asi que
+    # es la unica puerta de entrada de todo el sistema.
+    ports:
+      # Formato host:contenedor. El 4200 de la maquina entra al 80 del
+      # contenedor, donde escucha Nginx. La app abre en http://localhost:4200.
+      - "4200:80"
+
+    # Orden de arranque: Docker levanta primero los servicios listados aca.
+    depends_on:
+      # Espera a que los contenedores dependientes inicien.
+      - bff
+      - backend
+
+  # Tercer servicio: BFF (Backend for Frontend).
+  # Patron que unifica y adapta los datos a medida de la pantalla de Angular.
+  # Nginx le reenvia /api/inicio. El BFF consulta a backend:8080 en paralelo
+  # y devuelve una sola respuesta compuesta.
+  bff:
+    build: ./bff
+    expose:
+      - "3000"
+    environment:
+      - BACKEND_URL=http://backend:8080
+    depends_on:
+      - backend
+
+  # Servicio de dominio (Spring Boot). Este nombre es exactamente el que aparece
+  # en el proxy_pass del nginx.conf: http://backend:8080 y en el BFF.
+  backend:
+    # Construye la imagen con el Dockerfile de la carpeta ./backend.
+    build: ./backend
+
+    # "expose" es documentacion: le avisa a quien lee el archivo en que puerto
+    # escucha este servicio. No abre ni cierra nada. Si lo borraramos, todo
+    # seguiria funcionando igual.
+    expose:
+      - "8080"
+

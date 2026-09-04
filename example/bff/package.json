@@ -1,0 +1,13 @@
+{
+  "name": "bff",
+  "version": "1.0.0",
+  "description": "Backend For Frontend (BFF) en Node.js para Pizzeria Don Nginx",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
