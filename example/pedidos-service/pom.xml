@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>ar.edu.utn.tup</groupId>
-	<artifactId>backend</artifactId>
+	<artifactId>pedidos-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>backend</name>
-	<description>Backend de ejemplo detras de Nginx</description>
+	<name>pedidos-service</name>
+	<description>Microservicio de pedidos de la Pizzeria Don Nginx</description>
 	<url/>
 	<licenses>
 		<license/>

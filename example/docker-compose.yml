@@ -1,4 +1,15 @@
-# Bloque donde se declara cada contenedor que forma parte de la aplicacion.
+# Orquesta todos los contenedores de la Pizzeria Don Nginx.
+# La arquitectura tiene 4 servicios:
+#
+#   Navegador (localhost:4200)
+#       └── frontend (Nginx en port 80)
+#               └── /api/* ──► bff (Express en port 3000)
+#                                  ├── pedidos-service (Spring Boot :8081)
+#                                  └── pagos-service   (Spring Boot :8082)
+#
+# Solo el frontend publica un puerto al host. El resto se comunica por la
+# red interna de Docker Compose (el nombre del servicio es el hostname).
+
 services:
 
   # Nombre del servicio. Docker lo usa como nombre de host adentro de la red:
@@ -17,32 +28,41 @@ services:
 
     # Orden de arranque: Docker levanta primero los servicios listados aca.
     depends_on:
-      # Espera a que los contenedores dependientes inicien.
       - bff
-      - backend
 
-  # Tercer servicio: BFF (Backend for Frontend).
-  # Patron que unifica y adapta los datos a medida de la pantalla de Angular.
-  # Nginx le reenvia /api/inicio. El BFF consulta a backend:8080 en paralelo
-  # y devuelve una sola respuesta compuesta.
+  # BFF (Backend for Frontend): patron que unifica y adapta los datos a medida
+  # de la pantalla de Angular. Nginx le reenvia todo /api/*. El BFF consulta
+  # a pedidos-service y pagos-service en paralelo (fan-out) y devuelve una
+  # sola respuesta compuesta para /api/inicio, o rutea directamente para
+  # /api/pedidos y /api/pagos.
   bff:
     build: ./bff
     expose:
       - "3000"
     environment:
-      - BACKEND_URL=http://backend:8080
+      # URL de cada microservicio en la red interna de Docker.
+      # El nombre del servicio (pedidos-service, pagos-service) actua como
+      # hostname: Docker resuelve automaticamente las IPs adentro de la red.
+      - PEDIDOS_URL=http://pedidos-service:8081
+      - PAGOS_URL=http://pagos-service:8082
     depends_on:
-      - backend
+      - pedidos-service
+      - pagos-service
 
-  # Servicio de dominio (Spring Boot). Este nombre es exactamente el que aparece
-  # en el proxy_pass del nginx.conf: http://backend:8080 y en el BFF.
-  backend:
-    # Construye la imagen con el Dockerfile de la carpeta ./backend.
-    build: ./backend
-
+  # Microservicio de pedidos (Spring Boot, puerto 8081).
+  # Contenedor independiente: tiene su propio Dockerfile, su propia JVM y
+  # solo expone el endpoint GET /pedidos.
+  pedidos-service:
+    build: ./pedidos-service
     # "expose" es documentacion: le avisa a quien lee el archivo en que puerto
-    # escucha este servicio. No abre ni cierra nada. Si lo borraramos, todo
-    # seguiria funcionando igual.
+    # escucha este servicio. No abre ni cierra nada hacia el host.
     expose:
-      - "8080"
+      - "8081"
 
+  # Microservicio de pagos (Spring Boot, puerto 8082).
+  # Contenedor independiente: tiene su propio Dockerfile, su propia JVM y
+  # solo expone el endpoint GET /pagos.
+  pagos-service:
+    build: ./pagos-service
+    expose:
+      - "8082"

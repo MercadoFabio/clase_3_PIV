@@ -1,8 +1,9 @@
-# Ejemplo: Docker + Nginx + Angular + BFF (Node.js) + Spring Boot
+# Pizzería Don Nginx — Ejemplo práctico
 
-Ejemplo minimo de la infraestructura de la Unidad 3: Nginx sirve el build de Angular
-y, al mismo tiempo, hace de proxy inverso y gateway hacia un **BFF (Backend for Frontend)**
-y hacia el backend Spring Boot. El navegador solo conoce a Nginx.
+Ejemplo mínimo de la infraestructura de la Unidad 3: Nginx sirve el build de Angular
+y, al mismo tiempo, hace de **API Gateway** hacia un **BFF (Backend for Frontend)** en Node.js,
+que a su vez consulta a dos **microservicios Spring Boot independientes** — tal como muestra
+la arquitectura de la Pizzería Don Nginx en las diapositivas.
 
 ## Levantarlo
 
@@ -10,7 +11,7 @@ y hacia el backend Spring Boot. El navegador solo conoce a Nginx.
 docker compose up --build
 ```
 
-Despues, abrir <http://localhost:4200>. La pantalla de inicio muestra los pedidos
+Después, abrir <http://localhost:4200>. La pantalla de inicio muestra los pedidos
 consolidados con su estado de pago, combinados por el BFF en una sola llamada.
 
 Para parar todo: `Ctrl+C` y `docker compose down`.
@@ -24,46 +25,62 @@ Abrí dos ventanas al dar la clase para que vean la traza completa:
    ```bash
    docker compose logs -f
    ```
-   Al hacer clic en el frontend, se ve en vivo:
-   - `[BFF :3000]` ejecutando el Fan-Out en paralelo hacia los microservicios.
-   - `[BACKEND :8080]` recibiendo las llamadas desde la IP interna del BFF y despachando los datos.
+   Al hacer clic en el frontend, se ve en vivo cuatro servicios respondiendo:
+   - `[BFF :3000]` ejecutando el Fan-Out en paralelo hacia los dos microservicios.
+   - `[pedidos-service :8081]` recibiendo el `GET /pedidos` y despachando los datos.
+   - `[pagos-service :8082]` recibiendo el `GET /pagos` y despachando los datos.
 
-## Como viaja una solicitud
+## Arquitectura — Como viaja una solicitud
 
 ```
-navegador  ->  localhost:4200  ->  Nginx  ->  archivos estaticos (Angular)
-                                        \->  bff:3000/api/inicio  ->  backend:8080/pedidos
-                                        \                         \->  backend:8080/pagos
-                                         \->  backend:8080        para /api/pedidos
+Navegador → localhost:4200
+                 │
+           Nginx (port 80)
+           ├── /              ──► Angular SPA (archivos estáticos)
+           └── /api/*         ──► BFF :3000
+                                      │
+                                      ├── GET /api/inicio (fan-out paralelo)
+                                      │     ├── pedidos-service:8081/pedidos
+                                      │     └── pagos-service:8082/pagos
+                                      │
+                                      ├── GET /api/pedidos ──► pedidos-service:8081
+                                      └── GET /api/pagos   ──► pagos-service:8082
+
+        Red interna Docker (invisible desde el navegador):
+        ├── bff                :3000
+        ├── pedidos-service    :8081
+        └── pagos-service      :8082
 ```
 
-- `GET /` → Nginx devuelve `index.html` y los estaticos del build de Angular.
-- `GET /api/inicio` → Nginx lo reenvia al **BFF** (`http://bff:3000/api/inicio`), que consulta en paralelo a los microservicios (`/pedidos` y `/pagos`), unifica la informacion y entrega la respuesta lista para la pantalla (patron de las filminas 27-C, 35 y 36).
-- `GET /api/pedidos` → Nginx lo reenvia directamente a `http://backend:8080/pedidos`.
+- `GET /` → Nginx devuelve `index.html` y los estáticos del build de Angular.
+- `GET /api/inicio` → Nginx lo reenvía al **BFF** (`http://bff:3000/api/inicio`), que consulta en paralelo a `pedidos-service:8081` y `pagos-service:8082`, unifica la información y entrega la respuesta lista para la pantalla (patrón de las filminas 27-C, 35 y 36).
+- `GET /api/pedidos` → Nginx lo reenvía al BFF, que consulta solo a `pedidos-service:8081`.
+- `GET /api/pagos` → Nginx lo reenvía al BFF, que consulta solo a `pagos-service:8082`.
 
-`bff` y `backend` son nombres de servicio en `docker-compose.yml`: dentro de la red
-interna de Docker funcionan como nombres de host. Desde el navegador esos nombres no
-existen, y sus puertos tampoco estan publicados hacia el exterior. Por eso el frontend
-pide `/api/...` al origen de Nginx (puerto 4200).
+`bff`, `pedidos-service` y `pagos-service` son nombres de servicio en `docker-compose.yml`:
+dentro de la red interna de Docker funcionan como nombres de host. Desde el navegador esos
+nombres no existen, y sus puertos tampoco están publicados hacia el exterior. Por eso el
+frontend pide `/api/...` al origen de Nginx (puerto 4200).
 
 ## Archivos que importan
 
-| Archivo | Que hace |
+| Archivo | Qué hace |
 | --- | --- |
-| `frontend/nginx.conf` | Servidor web y proxy inverso: rutea `/api/inicio` al BFF y `/api/` al backend. |
-| `bff/src/index.js` | El BFF en Node.js/Express: hace fan-out en paralelo y compone la respuesta de la pantalla. |
+| `frontend/nginx.conf` | API Gateway: rutea `/api/*` al BFF y `/` al Angular build. |
+| `bff/src/index.js` | BFF en Node.js/Express: fan-out paralelo hacia los dos microservicios. |
 | `bff/Dockerfile` | Imagen liviana de Node.js Alpine para ejecutar el BFF. |
-| `frontend/Dockerfile` | Build en dos etapas: Node compila, la imagen final solo lleva Nginx. |
-| `backend/Dockerfile` | Mismo patron: Maven compila, la imagen final solo lleva el JRE y el `.jar`. |
-| `docker-compose.yml` | Orquesta los tres servicios en una red privada, con Nginx como unica puerta al exterior. |
-| `frontend/src/app/app.ts` | Toda la app Angular: consume `/api/inicio` y renderiza los datos combinados. |
-| `backend/.../BackendApplication.java` | Endpoints de dominio `/pedidos` y `/pagos` en Spring Boot. |
-| `frontend/Dockerfile.node` | Contraejemplo: la misma app servida sin Nginx. |
+| `frontend/Dockerfile` | Build en dos etapas: Node compila Angular, la imagen final solo lleva Nginx. |
+| `pedidos-service/src/.../PedidosApplication.java` | Microservicio Spring Boot en port 8081: solo `/pedidos`. |
+| `pagos-service/src/.../PagosApplication.java` | Microservicio Spring Boot en port 8082: solo `/pagos`. |
+| `pedidos-service/Dockerfile` | Multi-stage: Maven compila, imagen final lleva el JRE y el `.jar`. |
+| `pagos-service/Dockerfile` | Idéntico patrón para pagos. |
+| `docker-compose.yml` | Orquesta 4 servicios en una red privada, con Nginx como única puerta al exterior. |
+| `frontend/src/app/app.ts` | Toda la app Angular: navbar con 3 tabs y consola de trazas en vivo. |
 
 ## El contraejemplo: servir sin Nginx
 
-`frontend/Dockerfile.node` no lo usa el compose. Esta ahi para mostrar que
-pasa cuando se reemplaza Nginx por un servidor de estaticos de Node:
+`frontend/Dockerfile.node` no lo usa el compose. Está ahí para mostrar qué
+pasa cuando se reemplaza Nginx por un servidor de estáticos de Node:
 
 ```bash
 cd frontend
@@ -71,27 +88,13 @@ docker build -f Dockerfile.node -t frontend-node .
 docker run --rm -p 3000:3000 frontend-node
 ```
 
-En <http://localhost:3000> la aplicacion carga, pero la lista de pedidos queda
-vacia: no hay proxy inverso, asi que `/api/pedidos` nunca llega al backend.
+En <http://localhost:3000> la aplicación carga, pero la lista de pedidos queda
+vacía: no hay proxy inverso, así que `/api/pedidos` nunca llega al backend.
 El detalle interesante es que tampoco da 404 — devuelve el `index.html` con
 `content-type: text/html`, y el frontend falla al intentar parsearlo como JSON.
-Ademas la imagen pesa 179 MB contra los 53 MB de la que usa Nginx.
+Además la imagen pesa 179 MB contra los 53 MB de la que usa Nginx.
 
-## Correrlo sin Docker (para desarrollo)
-
-```bash
-# terminal 1
-cd backend && ./mvnw spring-boot:run
-
-# terminal 2
-cd frontend && npm start
-```
-
-Ojo: asi no hay Nginx en el medio, y `/api/pedidos` da 404. Para desarrollo habria
-que configurar un proxy en `angular.json`; en este ejemplo el punto es justamente
-que en produccion ese trabajo lo hace Nginx.
-
-## Como se genero
+## Cómo se generó
 
 Todo con los CLIs oficiales, sin plantillas a mano:
 
@@ -99,7 +102,12 @@ Todo con los CLIs oficiales, sin plantillas a mano:
 npx @angular/cli@21 new frontend --minimal --style=css --routing=false --ssr=false \
   --inline-template --inline-style --skip-git --ai-config=none
 
+# Dos microservicios independientes generados desde Spring Initializr:
 curl https://start.spring.io/starter.zip -d type=maven-project -d language=java \
   -d bootVersion=4.1.0 -d javaVersion=21 -d dependencies=web \
-  -d groupId=ar.edu.utn.tup -d artifactId=backend -o backend.zip
+  -d groupId=ar.edu.utn.tup -d artifactId=pedidos-service -o pedidos-service.zip
+
+curl https://start.spring.io/starter.zip -d type=maven-project -d language=java \
+  -d bootVersion=4.1.0 -d javaVersion=21 -d dependencies=web \
+  -d groupId=ar.edu.utn.tup -d artifactId=pagos-service -o pagos-service.zip
 ```

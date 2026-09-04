@@ -3,8 +3,13 @@ import express from 'express';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// URL del backend / microservicios dentro de la red interna de Docker.
-const BACKEND_URL = process.env.BACKEND_URL || 'http://backend:8080';
+// ---------------------------------------------------------------------------
+// URLs de los microservicios en la red interna de Docker Compose.
+// Antes habia un BACKEND_URL unico. Ahora cada microservicio tiene
+// su propia URL y su propio contenedor independiente.
+// ---------------------------------------------------------------------------
+const PEDIDOS_URL = process.env.PEDIDOS_URL || 'http://pedidos-service:8081';
+const PAGOS_URL   = process.env.PAGOS_URL   || 'http://pagos-service:8082';
 
 // ---------------------------------------------------------------------------
 // Middleware de Logging en Vivo
@@ -29,14 +34,16 @@ app.use((req, res, next) => {
 // ---------------------------------------------------------------------------
 // Filminas 27-C, 35 y 36: Resuelve la pantalla combinada ejecutando un Fan-Out
 // en paralelo hacia los microservicios de dominio (pedidos y pagos).
+// Cada microservicio corre en su propio contenedor, lo que se puede ver en los
+// logs de Docker: pedidos-service y pagos-service responden al mismo tiempo.
 app.get('/api/inicio', async (req, res) => {
   const t0 = performance.now();
-  console.log(`[BFF :3000] 🚀 [Fan-Out Paralelo] Consultando ${BACKEND_URL}/pedidos y ${BACKEND_URL}/pagos al mismo tiempo...`);
+  console.log(`[BFF :3000] 🚀 [Fan-Out Paralelo] Consultando pedidos-service:8081/pedidos y pagos-service:8082/pagos al mismo tiempo...`);
 
   try {
     const [pedidosRes, pagosRes] = await Promise.all([
-      fetch(`${BACKEND_URL}/pedidos`),
-      fetch(`${BACKEND_URL}/pagos`),
+      fetch(`${PEDIDOS_URL}/pedidos`),
+      fetch(`${PAGOS_URL}/pagos`),
     ]);
 
     if (!pedidosRes.ok || !pagosRes.ok) {
@@ -74,7 +81,10 @@ app.get('/api/inicio', async (req, res) => {
       pagosPendientes: pagos.filter((p) => p.estado === 'PENDIENTE'),
       meta: {
         origen: 'BFF (Node.js/Express en puerto 3000)',
-        consultasRealizadasEnParalelo: ['GET http://backend:8080/pedidos', 'GET http://backend:8080/pagos'],
+        consultasRealizadasEnParalelo: [
+          `GET ${PEDIDOS_URL}/pedidos`,
+          `GET ${PAGOS_URL}/pagos`,
+        ],
         tiempoFanOutMs: elapsed,
         timestamp: new Date().toISOString(),
       },
@@ -92,15 +102,16 @@ app.get('/api/inicio', async (req, res) => {
 // 2. Endpoint Específico: GET /api/pedidos
 // ---------------------------------------------------------------------------
 // Permite que la pantalla de Pedidos consulte directamente a traves del BFF.
+// El BFF consulta solo a pedidos-service:8081, sin tocar pagos-service.
 app.get('/api/pedidos', async (req, res) => {
-  console.log(`[BFF :3000] 🍕 Consultando backend:8080/pedidos...`);
+  console.log(`[BFF :3000] 🍕 Consultando pedidos-service:8081/pedidos...`);
   try {
-    const upstreamRes = await fetch(`${BACKEND_URL}/pedidos`);
+    const upstreamRes = await fetch(`${PEDIDOS_URL}/pedidos`);
     const data = await upstreamRes.json();
     res.json({
       seccion: 'Listado de Pedidos',
       items: data,
-      meta: { origen: 'BFF -> Backend /pedidos', timestamp: new Date().toISOString() },
+      meta: { origen: `BFF -> pedidos-service (${PEDIDOS_URL})`, timestamp: new Date().toISOString() },
     });
   } catch (error) {
     res.status(502).json({ error: error.message });
@@ -111,15 +122,16 @@ app.get('/api/pedidos', async (req, res) => {
 // 3. Endpoint Específico: GET /api/pagos
 // ---------------------------------------------------------------------------
 // Permite que la pantalla de Pagos consulte directamente a traves del BFF.
+// El BFF consulta solo a pagos-service:8082, sin tocar pedidos-service.
 app.get('/api/pagos', async (req, res) => {
-  console.log(`[BFF :3000] 💳 Consultando backend:8080/pagos...`);
+  console.log(`[BFF :3000] 💳 Consultando pagos-service:8082/pagos...`);
   try {
-    const upstreamRes = await fetch(`${BACKEND_URL}/pagos`);
+    const upstreamRes = await fetch(`${PAGOS_URL}/pagos`);
     const data = await upstreamRes.json();
     res.json({
       seccion: 'Listado de Pagos',
       items: data,
-      meta: { origen: 'BFF -> Backend /pagos', timestamp: new Date().toISOString() },
+      meta: { origen: `BFF -> pagos-service (${PAGOS_URL})`, timestamp: new Date().toISOString() },
     });
   } catch (error) {
     res.status(502).json({ error: error.message });
@@ -133,6 +145,7 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`=======================================================`);
   console.log(`⚡ [BFF] Node.js/Express iniciado en puerto ${PORT}`);
-  console.log(`🔗 [BFF] Conectado a microservicios en ${BACKEND_URL}`);
+  console.log(`🍕 [BFF] Microservicio de pedidos: ${PEDIDOS_URL}`);
+  console.log(`💳 [BFF] Microservicio de pagos:   ${PAGOS_URL}`);
   console.log(`=======================================================`);
 });

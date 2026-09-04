@@ -10,19 +10,17 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 
 # Copia solo el pom.xml (donde estan declaradas las dependencias) al directorio
-# actual. El "." final es /app. Va primero para aprovechar la cache de Docker.
+# actual. Va primero para aprovechar la cache de Docker.
 COPY pom.xml .
 
 # Descarga todas las dependencias declaradas en el pom y las deja en la cache
 # local de Maven. Mientras el pom.xml no cambie, Docker saltea este paso entero.
-# El -q (quiet) baja el ruido del log.
 RUN mvn -q dependency:go-offline
 
 # Copia la carpeta src/ de la maquina hacia /app/src del contenedor.
 COPY src ./src
 
 # Compila y empaqueta el proyecto: deja el .jar ejecutable en /app/target/.
-# -DskipTests saltea los tests, que ya deberian haber corrido en el pipeline.
 RUN mvn -q package -DskipTests
 
 # ---------------------------------------------------------------------------
@@ -33,13 +31,11 @@ RUN mvn -q package -DskipTests
 # trae el runtime de Java 21. Maven, el JDK y el codigo fuente quedan afuera.
 FROM eclipse-temurin:21-jre-alpine
 
-# Directorio de trabajo de esta segunda imagen, que no hereda nada de la primera.
 WORKDIR /app
 
 # Copia el .jar generado en la etapa "build" y lo renombra a app.jar.
-# El comodin *.jar evita tener que escribir la version en el nombre del archivo.
 COPY --from=build /app/target/*.jar app.jar
 
-# Comando con el que arranca el contenedor: levanta la app Spring Boot.
-# ENTRYPOINT en formato lista ejecuta java directamente, sin una shell en el medio.
+# Levanta el microservicio de pedidos. Escucha en el puerto 8081 (definido
+# en application.properties).
 ENTRYPOINT ["java", "-jar", "app.jar"]
