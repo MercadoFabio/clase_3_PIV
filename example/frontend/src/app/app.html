@@ -1,6 +1,6 @@
 <!-- ============================================================
      app.html — Template del componente raíz
-     Pizzería Don Nginx · Clean Code & Arquitectura Modular
+     Pizzería Don Nginx · Ejemplo directo y limpio
      ============================================================ -->
 
 <div class="app-container">
@@ -113,11 +113,6 @@
             }
           </div>
         </section>
-      } @else {
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <p>Consultando Fan-Out consolidado a través del BFF...</p>
-        </div>
       }
     }
 
@@ -125,7 +120,6 @@
     @if (activeTab === 'orders') {
       <app-orders 
         [items]="ordersList" 
-        [isLoading]="isOrdersLoading"
         (refresh)="loadOrders()">
       </app-orders>
     }
@@ -134,7 +128,6 @@
     @if (activeTab === 'payments') {
       <app-payments 
         [items]="paymentsList" 
-        [isLoading]="isPaymentsLoading"
         (refresh)="loadPayments()">
       </app-payments>
     }

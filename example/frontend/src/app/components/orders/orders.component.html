@@ -7,36 +7,23 @@
         Datos provistos por <code>pedidos-service:8081</code> consumidos vía BFF (<code>/api/pedidos</code>).
       </p>
     </div>
-    <button class="btn-refresh" [disabled]="isLoading" (click)="onRefresh()">
-      @if (isLoading) {
-        <span class="btn-spinner"></span> Actualizando...
-      } @else {
-        🔄 Refrescar
-      }
-    </button>
+    <button class="btn-refresh" (click)="onRefresh()">🔄 Refrescar</button>
   </div>
 
-  @if (isLoading && (!items || items.length === 0)) {
-    <div class="component-loading">
-      <div class="spinner"></div>
-      <p>Cargando pedidos desde pedidos-service:8081...</p>
-    </div>
-  } @else {
-    <div class="cards-grid">
-      @for (item of items; track item.id) {
-        <div class="item-card">
-          <div class="item-header">
-            <span class="item-id">#{{ item.id }}</span>
-            <span class="badge badge-blue">pedidos-service :8081</span>
-          </div>
-          <div class="item-body">
-            <h4>{{ item.pizza }}</h4>
-            <p class="item-quantity">Unidades: <strong>x{{ item.cantidad }}</strong></p>
-          </div>
+  <div class="cards-grid">
+    @for (item of items; track item.id) {
+      <div class="item-card">
+        <div class="item-header">
+          <span class="item-id">#{{ item.id }}</span>
+          <span class="badge badge-blue">pedidos-service :8081</span>
         </div>
-      } @empty {
-        <p class="empty-state">No hay pedidos disponibles en este momento.</p>
-      }
-    </div>
-  }
+        <div class="item-body">
+          <h4>{{ item.pizza }}</h4>
+          <p class="item-quantity">Unidades: <strong>x{{ item.cantidad }}</strong></p>
+        </div>
+      </div>
+    } @empty {
+      <p class="empty-state">No hay pedidos disponibles.</p>
+    }
+  </div>
 </section>

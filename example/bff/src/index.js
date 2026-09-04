@@ -5,14 +5,12 @@ const PORT = process.env.PORT || 3000;
 
 // ---------------------------------------------------------------------------
 // URLs de los microservicios en la red interna de Docker Compose.
-// Antes habia un BACKEND_URL unico. Ahora cada microservicio tiene
-// su propia URL y su propio contenedor independiente.
 // ---------------------------------------------------------------------------
 const PEDIDOS_URL = process.env.PEDIDOS_URL || 'http://pedidos-service:8081';
 const PAGOS_URL   = process.env.PAGOS_URL   || 'http://pagos-service:8082';
 
 // ---------------------------------------------------------------------------
-// Middleware de Logging en Vivo
+// Middleware: Desactivar caché HTTP y registrar logs en vivo
 // ---------------------------------------------------------------------------
 app.use((req, res, next) => {
   const start = Date.now();
@@ -24,18 +22,18 @@ app.use((req, res, next) => {
     console.log(`[${timeStr}] [BFF :3000] 📤 Respuesta enviada: ${req.method} ${req.originalUrl} -> Status ${res.statusCode} (${elapsed}ms)`);
   });
 
-  // Cabecera informativa para que el frontend y los alumnos identifiquen al BFF
+  // Desactivar cualquier caché en el navegador
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.setHeader('X-Handled-By', 'BFF-NodeJS-Express');
+
   next();
 });
 
 // ---------------------------------------------------------------------------
-// 1. Endpoint Consolidado: GET /api/inicio
+// 1. Endpoint Consolidado: GET /api/inicio (Fan-Out paralelo)
 // ---------------------------------------------------------------------------
-// Filminas 27-C, 35 y 36: Resuelve la pantalla combinada ejecutando un Fan-Out
-// en paralelo hacia los microservicios de dominio (pedidos y pagos).
-// Cada microservicio corre en su propio contenedor, lo que se puede ver en los
-// logs de Docker: pedidos-service y pagos-service responden al mismo tiempo.
 app.get('/api/inicio', async (req, res) => {
   const t0 = performance.now();
   console.log(`[BFF :3000] 🚀 [Fan-Out Paralelo] Consultando pedidos-service:8081/pedidos y pagos-service:8082/pagos al mismo tiempo...`);
@@ -58,88 +56,95 @@ app.get('/api/inicio', async (req, res) => {
 
     // Cruzar cada pedido con su estado de pago
     const pedidosConPago = pedidos.map((pedido) => {
-      const pago = pagos.find((p) => p.pedidoId === pedido.id);
+      const pagoAsociado = pagos.find((pago) => pago.pedidoId === pedido.id);
       return {
         ...pedido,
-        pago: pago ? { estado: pago.estado, monto: pago.monto } : { estado: 'DESCONOCIDO', monto: 0 },
+        pago: pagoAsociado
+          ? { estado: pagoAsociado.estado, monto: pagoAsociado.monto }
+          : { estado: 'DESCONOCIDO', monto: 0 },
       };
     });
 
-    const totalRecaudado = pagos
-      .filter((p) => p.estado === 'PAGADO')
-      .reduce((acc, p) => acc + p.monto, 0);
+    const pagosConfirmados = pagos.filter((p) => p.estado === 'PAGADO');
+    const recaudacionConfirmada = pagosConfirmados.reduce((sum, p) => sum + p.monto, 0);
 
-    res.json({
+    const respuestaParaFrontend = {
       titulo: 'Pizzeria Don Nginx - Panel de Control',
       resumen: {
         totalPedidos: pedidos.length,
-        totalPagados: pagos.filter((p) => p.estado === 'PAGADO').length,
+        totalPagados: pagosConfirmados.length,
         totalPendientes: pagos.filter((p) => p.estado === 'PENDIENTE').length,
-        recaudacionConfirmada: totalRecaudado,
+        recaudacionConfirmada,
       },
       pedidos: pedidosConPago,
       pagosPendientes: pagos.filter((p) => p.estado === 'PENDIENTE'),
       meta: {
         origen: 'BFF (Node.js/Express en puerto 3000)',
         consultasRealizadasEnParalelo: [
-          `GET ${PEDIDOS_URL}/pedidos`,
-          `GET ${PAGOS_URL}/pagos`,
+          `${PEDIDOS_URL}/pedidos`,
+          `${PAGOS_URL}/pagos`,
         ],
         tiempoFanOutMs: elapsed,
         timestamp: new Date().toISOString(),
       },
-    });
+    };
+
+    res.json(respuestaParaFrontend);
   } catch (error) {
     console.error(`[BFF :3000] ❌ Error en Fan-Out:`, error.message);
     res.status(502).json({
-      error: 'Error de comunicacion con los servicios backend',
+      error: 'Error al consultar los microservicios aguas abajo',
       detalle: error.message,
     });
   }
 });
 
 // ---------------------------------------------------------------------------
-// 2. Endpoint Específico: GET /api/pedidos
+// 2. Proxy simple hacia el microservicio de Pedidos
 // ---------------------------------------------------------------------------
-// Permite que la pantalla de Pedidos consulte directamente a traves del BFF.
-// El BFF consulta solo a pedidos-service:8081, sin tocar pagos-service.
 app.get('/api/pedidos', async (req, res) => {
-  console.log(`[BFF :3000] 🍕 Consultando pedidos-service:8081/pedidos...`);
   try {
+    console.log(`[BFF :3000] ➡️ Reenviando a ${PEDIDOS_URL}/pedidos...`);
     const upstreamRes = await fetch(`${PEDIDOS_URL}/pedidos`);
+    if (!upstreamRes.ok) throw new Error(`Status ${upstreamRes.status}`);
     const data = await upstreamRes.json();
+
     res.json({
       seccion: 'Listado de Pedidos',
       items: data,
-      meta: { origen: `BFF -> pedidos-service (${PEDIDOS_URL})`, timestamp: new Date().toISOString() },
+      meta: {
+        origen: `BFF -> pedidos-service (${PEDIDOS_URL})`,
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (error) {
+    console.error(`[BFF :3000] ❌ Error en /api/pedidos:`, error.message);
     res.status(502).json({ error: error.message });
   }
 });
 
 // ---------------------------------------------------------------------------
-// 3. Endpoint Específico: GET /api/pagos
+// 3. Proxy simple hacia el microservicio de Pagos
 // ---------------------------------------------------------------------------
-// Permite que la pantalla de Pagos consulte directamente a traves del BFF.
-// El BFF consulta solo a pagos-service:8082, sin tocar pedidos-service.
 app.get('/api/pagos', async (req, res) => {
-  console.log(`[BFF :3000] 💳 Consultando pagos-service:8082/pagos...`);
   try {
+    console.log(`[BFF :3000] ➡️ Reenviando a ${PAGOS_URL}/pagos...`);
     const upstreamRes = await fetch(`${PAGOS_URL}/pagos`);
+    if (!upstreamRes.ok) throw new Error(`Status ${upstreamRes.status}`);
     const data = await upstreamRes.json();
+
     res.json({
       seccion: 'Listado de Pagos',
       items: data,
-      meta: { origen: `BFF -> pagos-service (${PAGOS_URL})`, timestamp: new Date().toISOString() },
+      meta: {
+        origen: `BFF -> pagos-service (${PAGOS_URL})`,
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (error) {
+    console.error(`[BFF :3000] ❌ Error en /api/pagos:`, error.message);
     res.status(502).json({ error: error.message });
   }
-});
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'UP', service: 'bff' });
 });
 
 app.listen(PORT, () => {

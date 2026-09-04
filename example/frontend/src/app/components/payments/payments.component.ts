@@ -1,11 +1,10 @@
-import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Payment } from '../../models/pizzeria.models';
 
 /**
  * PaymentsComponent
- * 
- * Componente presentacional para el microservicio de pagos.
+ * Componente presentacional simple para mostrar los pagos.
  */
 @Component({
   selector: 'app-payments',
@@ -16,7 +15,6 @@ import { Payment } from '../../models/pizzeria.models';
 })
 export class PaymentsComponent {
   @Input() items: Payment[] = [];
-  @Input() isLoading: boolean = false;
   @Output() refresh = new EventEmitter<void>();
 
   onRefresh(): void {

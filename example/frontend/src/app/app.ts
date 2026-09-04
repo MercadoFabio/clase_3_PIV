@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PizzeriaService } from './services/pizzeria.service';
 import { OrdersComponent } from './components/orders/orders.component';
@@ -13,12 +13,10 @@ import {
 /**
  * App (Root Component)
  * 
- * Clean Code & Arquitectura:
- * - Toda la lógica y nombres en inglés.
- * - Comentarios pedagógicos en español.
- * - Sin Signals, sin Subject ni BehaviorSubject.
- * - Inyecta ChangeDetectorRef para garantizar que Angular actualice la vista
- *   inmediatamente cuando los datos lleguen desde el stream asíncrono.
+ * Flujo simple y transparente para clase:
+ * - Al hacer clic en una pestaña siempre consulta al backend en vivo.
+ * - Sin caché en memoria ni comprobaciones de listas vacías.
+ * - Registro directo en la consola de trazas.
  */
 @Component({
   selector: 'app-root',
@@ -29,14 +27,10 @@ import {
 })
 export class App implements OnInit {
   private readonly pizzeriaService = inject(PizzeriaService);
-  private readonly cdr = inject(ChangeDetectorRef);
 
   activeTab: 'dashboard' | 'orders' | 'payments' = 'dashboard';
 
-  isDashboardLoading: boolean = false;
-  isOrdersLoading: boolean = false;
-  isPaymentsLoading: boolean = false;
-
+  isLoading: boolean = false;
   dashboardData: DashboardResponse | null = null;
   ordersList: Order[] = [];
   paymentsList: Payment[] = [];
@@ -48,17 +42,18 @@ export class App implements OnInit {
 
   switchTab(tab: 'dashboard' | 'orders' | 'payments'): void {
     this.activeTab = tab;
-    if (tab === 'dashboard' && !this.dashboardData) {
+    // Siempre pide los datos al backend para mostrar la interacción en vivo
+    if (tab === 'dashboard') {
       this.loadDashboard();
-    } else if (tab === 'orders' && this.ordersList.length === 0) {
+    } else if (tab === 'orders') {
       this.loadOrders();
-    } else if (tab === 'payments' && this.paymentsList.length === 0) {
+    } else if (tab === 'payments') {
       this.loadPayments();
     }
   }
 
   loadDashboard(): void {
-    this.isDashboardLoading = true;
+    this.isLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/inicio';
 
@@ -66,22 +61,19 @@ export class App implements OnInit {
       next: (response) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.dashboardData = response.body;
-        this.isDashboardLoading = false;
+        this.isLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `BFF Fan-Out consolidado (${durationMs}ms)`);
-        this.cdr.detectChanges();
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
-        this.isDashboardLoading = false;
+        this.isLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
-        this.cdr.detectChanges();
-        console.error('Error loading dashboard:', error);
       }
     });
   }
 
   loadOrders(): void {
-    this.isOrdersLoading = true;
+    this.isLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/pedidos';
 
@@ -89,22 +81,19 @@ export class App implements OnInit {
       next: (response) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.ordersList = response.body?.items || [];
-        this.isOrdersLoading = false;
+        this.isLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `Microservicio pedidos-service :8081 (${durationMs}ms)`);
-        this.cdr.detectChanges();
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
-        this.isOrdersLoading = false;
+        this.isLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
-        this.cdr.detectChanges();
-        console.error('Error loading orders:', error);
       }
     });
   }
 
   loadPayments(): void {
-    this.isPaymentsLoading = true;
+    this.isLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/pagos';
 
@@ -112,23 +101,19 @@ export class App implements OnInit {
       next: (response) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.paymentsList = response.body?.items || [];
-        this.isPaymentsLoading = false;
+        this.isLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `Microservicio pagos-service :8082 (${durationMs}ms)`);
-        this.cdr.detectChanges();
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
-        this.isPaymentsLoading = false;
+        this.isLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
-        this.cdr.detectChanges();
-        console.error('Error loading payments:', error);
       }
     });
   }
 
   clearLogs(): void {
     this.logs = [];
-    this.cdr.detectChanges();
   }
 
   private addLog(method: string, url: string, status: number, durationMs: number, detail: string): void {
