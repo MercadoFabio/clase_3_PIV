@@ -19,8 +19,8 @@ import {
  * - Archivos separados: app.ts (lógica), app.html (template) y app.css (estilos).
  * - Delega la comunicación HTTP al servicio inyectado (PizzeriaService).
  * - NO usa Signals, NO usa BehaviorSubject, NO usa Subject.
- * - Carga los datos siempre al cambiar de tab para que el spinner y la traza
- *   se puedan apreciar en vivo en cada clic.
+ * - Si los datos ya existen en memoria se muestran inmediatamente.
+ *   El spinner solo se activa en refresco manual o si la vista está vacía.
  */
 @Component({
   selector: 'app-root',
@@ -32,10 +32,8 @@ import {
 export class App implements OnInit {
   private readonly pizzeriaService = inject(PizzeriaService);
 
-  // Estado activo de la interfaz
   activeTab: 'dashboard' | 'orders' | 'payments' = 'dashboard';
 
-  // Banderas de carga independientes
   isDashboardLoading: boolean = false;
   isOrdersLoading: boolean = false;
   isPaymentsLoading: boolean = false;
@@ -51,17 +49,17 @@ export class App implements OnInit {
 
   switchTab(tab: 'dashboard' | 'orders' | 'payments'): void {
     this.activeTab = tab;
-    // Siempre recargamos al cambiar de pestaña para mostrar la interacción en vivo
-    if (tab === 'dashboard') {
+    if (tab === 'dashboard' && !this.dashboardData) {
       this.loadDashboard();
-    } else if (tab === 'orders') {
+    } else if (tab === 'orders' && this.ordersList.length === 0) {
       this.loadOrders();
-    } else if (tab === 'payments') {
+    } else if (tab === 'payments' && this.paymentsList.length === 0) {
       this.loadPayments();
     }
   }
 
-  loadDashboard(): void {
+  loadDashboard(force: boolean = false): void {
+    if (this.isDashboardLoading) return;
     this.isDashboardLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/inicio';
@@ -82,7 +80,8 @@ export class App implements OnInit {
     });
   }
 
-  loadOrders(): void {
+  loadOrders(force: boolean = false): void {
+    if (this.isOrdersLoading) return;
     this.isOrdersLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/pedidos';
@@ -103,7 +102,8 @@ export class App implements OnInit {
     });
   }
 
-  loadPayments(): void {
+  loadPayments(force: boolean = false): void {
+    if (this.isPaymentsLoading) return;
     this.isPaymentsLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/pagos';

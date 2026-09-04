@@ -1,7 +1,6 @@
 <!-- ============================================================
      app.html — Template del componente raíz
      Pizzería Don Nginx · Clean Code & Arquitectura Modular
-     - Transición suave con spinners sin refresco brusco.
      ============================================================ -->
 
 <div class="app-container">
@@ -56,7 +55,7 @@
           <p>Consultando Fan-Out consolidado a través del BFF...</p>
         </div>
       } @else if (dashboardData; as data) {
-        <section class="section-card" [class.content-faded]="isDashboardLoading">
+        <section class="section-card">
 
           <!-- Banner explicativo del patrón BFF -->
           <div class="bff-banner">
@@ -93,12 +92,8 @@
             </div>
           </div>
 
-          <!-- Grilla de pedidos consolidados con pagos -->
           <div class="section-title-row">
             <h3>Pedidos y Estado de Pago Consolidado</h3>
-            @if (isDashboardLoading) {
-              <span class="sync-indicator"><span class="btn-spinner"></span> Actualizando...</span>
-            }
           </div>
 
           <div class="cards-grid">
@@ -131,7 +126,7 @@
       <app-orders 
         [items]="ordersList" 
         [isLoading]="isOrdersLoading"
-        (refresh)="loadOrders()">
+        (refresh)="loadOrders(true)">
       </app-orders>
     }
 
@@ -140,7 +135,7 @@
       <app-payments 
         [items]="paymentsList" 
         [isLoading]="isPaymentsLoading"
-        (refresh)="loadPayments()">
+        (refresh)="loadPayments(true)">
       </app-payments>
     }
 
