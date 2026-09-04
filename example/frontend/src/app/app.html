@@ -1,8 +1,7 @@
 <!-- ============================================================
      app.html — Template del componente raíz
      Pizzería Don Nginx · Clean Code & Arquitectura Modular
-     - Template enlazado a propiedades TypeScript en inglés.
-     - Comentarios en español para facilitar la comprensión en clase.
+     - Transición suave con spinners sin refresco brusco.
      ============================================================ -->
 
 <div class="app-container">
@@ -49,16 +48,15 @@
   <!-- ── ÁREA PRINCIPAL ──────────────────────────────────────── -->
   <main class="content-area">
 
-    @if (isLoading) {
-      <div class="loading-state">
-        <div class="spinner"></div>
-        <p>Consultando a la arquitectura de microservicios...</p>
-      </div>
-    } @else {
-
-      <!-- ── TAB 1: DASHBOARD (BFF FAN-OUT) ─────────────────────── -->
-      @if (activeTab === 'dashboard' && dashboardData; as data) {
-        <section class="section-card">
+    <!-- ── TAB 1: DASHBOARD (BFF FAN-OUT) ─────────────────────── -->
+    @if (activeTab === 'dashboard') {
+      @if (isDashboardLoading && !dashboardData) {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Consultando Fan-Out consolidado a través del BFF...</p>
+        </div>
+      } @else if (dashboardData; as data) {
+        <section class="section-card" [class.content-faded]="isDashboardLoading">
 
           <!-- Banner explicativo del patrón BFF -->
           <div class="bff-banner">
@@ -96,7 +94,13 @@
           </div>
 
           <!-- Grilla de pedidos consolidados con pagos -->
-          <h3>Pedidos y Estado de Pago Consolidado</h3>
+          <div class="section-title-row">
+            <h3>Pedidos y Estado de Pago Consolidado</h3>
+            @if (isDashboardLoading) {
+              <span class="sync-indicator"><span class="btn-spinner"></span> Actualizando...</span>
+            }
+          </div>
+
           <div class="cards-grid">
             @for (order of data.pedidos; track order.id) {
               <div class="item-card">
@@ -120,24 +124,26 @@
           </div>
         </section>
       }
-
-      <!-- ── TAB 2: PEDIDOS (COMPONENTE MODULAR) ─────────────────── -->
-      @if (activeTab === 'orders') {
-        <app-orders 
-          [items]="ordersList" 
-          (refresh)="loadOrders()">
-        </app-orders>
-      }
-
-      <!-- ── TAB 3: PAGOS (COMPONENTE MODULAR) ───────────────────── -->
-      @if (activeTab === 'payments') {
-        <app-payments 
-          [items]="paymentsList" 
-          (refresh)="loadPayments()">
-        </app-payments>
-      }
-
     }
+
+    <!-- ── TAB 2: PEDIDOS (COMPONENTE MODULAR) ─────────────────── -->
+    @if (activeTab === 'orders') {
+      <app-orders 
+        [items]="ordersList" 
+        [isLoading]="isOrdersLoading"
+        (refresh)="loadOrders()">
+      </app-orders>
+    }
+
+    <!-- ── TAB 3: PAGOS (COMPONENTE MODULAR) ───────────────────── -->
+    @if (activeTab === 'payments') {
+      <app-payments 
+        [items]="paymentsList" 
+        [isLoading]="isPaymentsLoading"
+        (refresh)="loadPayments()">
+      </app-payments>
+    }
+
   </main>
 
   <!-- ── CONSOLA DE TRAZAS EN VIVO ─────────────────────────── -->

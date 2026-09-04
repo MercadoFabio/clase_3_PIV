@@ -19,8 +19,7 @@ import {
  * - Archivos separados: app.ts (lógica), app.html (template) y app.css (estilos).
  * - Delega la comunicación HTTP al servicio inyectado (PizzeriaService).
  * - NO usa Signals, NO usa BehaviorSubject, NO usa Subject.
- * - Maneja el estado local directamente en propiedades estándar de TypeScript.
- * - Descompone la interfaz en subcomponentes modulares (OrdersComponent, PaymentsComponent).
+ * - Manejo suave de carga con spinners y banderas independientes para evitar parpadeos bruscos.
  */
 @Component({
   selector: 'app-root',
@@ -30,12 +29,15 @@ import {
   styleUrls: ['./app.css']
 })
 export class App implements OnInit {
-  // Inyección de dependencias moderna mediante inject()
   private readonly pizzeriaService = inject(PizzeriaService);
 
-  // Estado de la interfaz mediante propiedades estándar de TypeScript
+  // Estado activo de la interfaz
   activeTab: 'dashboard' | 'orders' | 'payments' = 'dashboard';
-  isLoading: boolean = false;
+
+  // Banderas de carga independientes para transiciones suaves
+  isDashboardLoading: boolean = false;
+  isOrdersLoading: boolean = false;
+  isPaymentsLoading: boolean = false;
 
   dashboardData: DashboardResponse | null = null;
   ordersList: Order[] = [];
@@ -43,7 +45,6 @@ export class App implements OnInit {
   logs: NetworkLogEntry[] = [];
 
   ngOnInit(): void {
-    // Carga de la pestaña inicial
     this.loadDashboard();
   }
 
@@ -59,7 +60,7 @@ export class App implements OnInit {
   }
 
   loadDashboard(): void {
-    this.isLoading = true;
+    this.isDashboardLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/inicio';
 
@@ -67,12 +68,12 @@ export class App implements OnInit {
       next: (response) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.dashboardData = response.body;
-        this.isLoading = false;
+        this.isDashboardLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `BFF Fan-Out consolidado (${durationMs}ms)`);
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
-        this.isLoading = false;
+        this.isDashboardLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
         console.error('Error loading dashboard:', error);
       }
@@ -80,7 +81,7 @@ export class App implements OnInit {
   }
 
   loadOrders(): void {
-    this.isLoading = true;
+    this.isOrdersLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/pedidos';
 
@@ -88,12 +89,12 @@ export class App implements OnInit {
       next: (response) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.ordersList = response.body?.items || [];
-        this.isLoading = false;
+        this.isOrdersLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `Microservicio pedidos-service :8081 (${durationMs}ms)`);
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
-        this.isLoading = false;
+        this.isOrdersLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
         console.error('Error loading orders:', error);
       }
@@ -101,7 +102,7 @@ export class App implements OnInit {
   }
 
   loadPayments(): void {
-    this.isLoading = true;
+    this.isPaymentsLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/pagos';
 
@@ -109,12 +110,12 @@ export class App implements OnInit {
       next: (response) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.paymentsList = response.body?.items || [];
-        this.isLoading = false;
+        this.isPaymentsLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `Microservicio pagos-service :8082 (${durationMs}ms)`);
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
-        this.isLoading = false;
+        this.isPaymentsLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
         console.error('Error loading payments:', error);
       }

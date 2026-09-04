@@ -7,8 +7,7 @@ import { Payment } from '../../models/pizzeria.models';
  * 
  * Componente presentacional para el microservicio de pagos.
  * - Sigue Clean Architecture (Dumb/Presentational Component).
- * - Código y propiedades en inglés.
- * - Comentarios explicativos en español.
+ * - Recibe isLoading para mostrar un spinner suave en lugar de parpadeos bruscos.
  */
 @Component({
   selector: 'app-payments',
@@ -19,6 +18,7 @@ import { Payment } from '../../models/pizzeria.models';
 })
 export class PaymentsComponent {
   @Input() items: Payment[] = [];
+  @Input() isLoading: boolean = false;
   @Output() refresh = new EventEmitter<void>();
 
   onRefresh(): void {
