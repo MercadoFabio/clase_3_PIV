@@ -10,7 +10,7 @@ echo.
 if not exist "cloudflared.exe" (
     echo [*] cloudflared.exe no encontrado.
     echo [*] Descargando automaticamente por unica vez...
-    powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe' -OutFile 'cloudflared.exe'"
+    curl.exe -L -# -o "cloudflared.exe" "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
     if not exist "cloudflared.exe" (
         echo [!] Error al descargar cloudflared.exe. Revisa tu conexion.
         pause
