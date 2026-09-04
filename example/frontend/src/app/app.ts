@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PizzeriaService } from './services/pizzeria.service';
 import { OrdersComponent } from './components/orders/orders.component';
@@ -15,12 +15,10 @@ import {
  * 
  * Clean Code & Arquitectura:
  * - Toda la lógica y nombres en inglés.
- * - Comentarios explicativos en español para docencia.
- * - Archivos separados: app.ts (lógica), app.html (template) y app.css (estilos).
- * - Delega la comunicación HTTP al servicio inyectado (PizzeriaService).
- * - NO usa Signals, NO usa BehaviorSubject, NO usa Subject.
- * - Si los datos ya existen en memoria se muestran inmediatamente.
- *   El spinner solo se activa en refresco manual o si la vista está vacía.
+ * - Comentarios pedagógicos en español.
+ * - Sin Signals, sin Subject ni BehaviorSubject.
+ * - Inyecta ChangeDetectorRef para garantizar que Angular actualice la vista
+ *   inmediatamente cuando los datos lleguen desde el stream asíncrono.
  */
 @Component({
   selector: 'app-root',
@@ -31,6 +29,7 @@ import {
 })
 export class App implements OnInit {
   private readonly pizzeriaService = inject(PizzeriaService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   activeTab: 'dashboard' | 'orders' | 'payments' = 'dashboard';
 
@@ -58,8 +57,7 @@ export class App implements OnInit {
     }
   }
 
-  loadDashboard(force: boolean = false): void {
-    if (this.isDashboardLoading) return;
+  loadDashboard(): void {
     this.isDashboardLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/inicio';
@@ -70,18 +68,19 @@ export class App implements OnInit {
         this.dashboardData = response.body;
         this.isDashboardLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `BFF Fan-Out consolidado (${durationMs}ms)`);
+        this.cdr.detectChanges();
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.isDashboardLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
+        this.cdr.detectChanges();
         console.error('Error loading dashboard:', error);
       }
     });
   }
 
-  loadOrders(force: boolean = false): void {
-    if (this.isOrdersLoading) return;
+  loadOrders(): void {
     this.isOrdersLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/pedidos';
@@ -92,18 +91,19 @@ export class App implements OnInit {
         this.ordersList = response.body?.items || [];
         this.isOrdersLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `Microservicio pedidos-service :8081 (${durationMs}ms)`);
+        this.cdr.detectChanges();
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.isOrdersLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
+        this.cdr.detectChanges();
         console.error('Error loading orders:', error);
       }
     });
   }
 
-  loadPayments(force: boolean = false): void {
-    if (this.isPaymentsLoading) return;
+  loadPayments(): void {
     this.isPaymentsLoading = true;
     const startTime = performance.now();
     const endpoint = '/api/pagos';
@@ -114,11 +114,13 @@ export class App implements OnInit {
         this.paymentsList = response.body?.items || [];
         this.isPaymentsLoading = false;
         this.addLog('GET', endpoint, response.status, durationMs, `Microservicio pagos-service :8082 (${durationMs}ms)`);
+        this.cdr.detectChanges();
       },
       error: (error) => {
         const durationMs = Math.round(performance.now() - startTime);
         this.isPaymentsLoading = false;
         this.addLog('GET', endpoint, error.status || 500, durationMs, `Error: ${error.message}`);
+        this.cdr.detectChanges();
         console.error('Error loading payments:', error);
       }
     });
@@ -126,6 +128,7 @@ export class App implements OnInit {
 
   clearLogs(): void {
     this.logs = [];
+    this.cdr.detectChanges();
   }
 
   private addLog(method: string, url: string, status: number, durationMs: number, detail: string): void {

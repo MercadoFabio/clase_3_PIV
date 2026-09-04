@@ -16,13 +16,13 @@
     </button>
   </div>
 
-  @if (isLoading && items.length === 0) {
+  @if (isLoading && (!items || items.length === 0)) {
     <div class="component-loading">
       <div class="spinner"></div>
       <p>Cargando pedidos desde pedidos-service:8081...</p>
     </div>
   } @else {
-    <div class="cards-grid" [class.content-faded]="isLoading">
+    <div class="cards-grid">
       @for (item of items; track item.id) {
         <div class="item-card">
           <div class="item-header">

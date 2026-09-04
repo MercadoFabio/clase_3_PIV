@@ -49,12 +49,7 @@
 
     <!-- ── TAB 1: DASHBOARD (BFF FAN-OUT) ─────────────────────── -->
     @if (activeTab === 'dashboard') {
-      @if (isDashboardLoading && !dashboardData) {
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <p>Consultando Fan-Out consolidado a través del BFF...</p>
-        </div>
-      } @else if (dashboardData; as data) {
+      @if (dashboardData; as data) {
         <section class="section-card">
 
           <!-- Banner explicativo del patrón BFF -->
@@ -118,6 +113,11 @@
             }
           </div>
         </section>
+      } @else {
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Consultando Fan-Out consolidado a través del BFF...</p>
+        </div>
       }
     }
 
@@ -126,7 +126,7 @@
       <app-orders 
         [items]="ordersList" 
         [isLoading]="isOrdersLoading"
-        (refresh)="loadOrders(true)">
+        (refresh)="loadOrders()">
       </app-orders>
     }
 
@@ -135,7 +135,7 @@
       <app-payments 
         [items]="paymentsList" 
         [isLoading]="isPaymentsLoading"
-        (refresh)="loadPayments(true)">
+        (refresh)="loadPayments()">
       </app-payments>
     }
 
