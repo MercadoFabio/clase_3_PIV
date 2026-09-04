@@ -76,8 +76,6 @@ docker compose down
 
 ## 🎓 Demostración en Vivo para Clases
 
-Para mostrar a los alumnos cómo interactúan las 3 capas en tiempo real:
-
 1. Abrí el navegador en **<http://localhost:4200>**:
    * Usá el **Navbar** para alternar entre:
      * 🏠 **Panel Consolidado (BFF `/api/inicio`)**: Vista con KPIs y pedidos cruzados con su estado de pago.
